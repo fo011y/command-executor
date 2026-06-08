@@ -17,6 +17,8 @@ import categoryRoutes from './routes/categories.js';
 import emailSettingsRoutes from './routes/emailSettings.js';
 import telegramLinkRoutes from './routes/telegramLink.js';
 import botExecuteRoutes from './routes/botExecute.js';
+import deviceApiRoutes from './routes/deviceApi.js';
+import deviceSettingsRoutes from './routes/deviceSettings.js';
 import { startFirmwareCron } from './scripts/firmwareCron.js';
 
 dotenv.config();
@@ -58,6 +60,8 @@ app.use('/api/firmware', firmwareRoutes);
 app.use('/api/email-settings', emailSettingsRoutes);
 app.use('/api/telegram', telegramLinkRoutes);
 app.use('/api/bot', botExecuteRoutes);
+app.use('/api/device', deviceApiRoutes);
+app.use('/api/device-settings', deviceSettingsRoutes);
 
 // Базовый маршрут
 app.get('/', (req, res) => {

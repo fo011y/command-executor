@@ -176,4 +176,40 @@ export const telegramAPI = {
   unlink: () => api.delete('/telegram/unlink')
 };
 
+// Device Settings API
+export const deviceSettingsAPI = {
+  getMyDevice: () =>
+    api.get('/device-settings'),
+
+  updateMyDevice: (data) =>
+    api.put('/device-settings', data),
+
+  getBrands: () =>
+    api.get('/device-settings/brands'),
+
+  getModels: (brandId) =>
+    api.get(`/device-settings/models/${brandId}`),
+
+  executeCommand: (commandId) =>
+    api.post(`/device-settings/commands/${commandId}/execute`),
+
+  // Admin
+  admin: {
+    getBrands: () => api.get('/device-settings/admin/brands'),
+    createBrand: (name) => api.post('/device-settings/admin/brands', { name }),
+    deleteBrand: (id) => api.delete(`/device-settings/admin/brands/${id}`),
+
+    getModels: () => api.get('/device-settings/admin/models'),
+    createModel: (data) => api.post('/device-settings/admin/models', data),
+    deleteModel: (id) => api.delete(`/device-settings/admin/models/${id}`),
+
+    getCommands: () => api.get('/device-settings/admin/commands'),
+    createCommand: (data) => api.post('/device-settings/admin/commands', data),
+    deleteCommand: (id) => api.delete(`/device-settings/admin/commands/${id}`),
+
+    setDeviceCommands: (deviceId, command_ids) =>
+      api.put(`/device-settings/admin/devices/${deviceId}/commands`, { command_ids })
+  }
+};
+
 export default api;

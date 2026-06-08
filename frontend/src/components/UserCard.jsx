@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { deviceSettingsAPI } from '../api/api';
 import './UserCard.css';
 
 const UserCard = () => {
@@ -11,30 +12,89 @@ const UserCard = () => {
   const [userData, setUserData] = useState(null);
   const [activeTab, setActiveTab] = useState('info');
 
+  // Устройство
+  const [brands, setBrands] = useState([]);
+  const [models, setModels] = useState([]);
+  const [selectedBrand, setSelectedBrand] = useState('');
+  const [selectedModel, setSelectedModel] = useState('');
+  const [deviceMsg, setDeviceMsg] = useState('');
+  const [deviceErr, setDeviceErr] = useState('');
+  const [deviceSaving, setDeviceSaving] = useState(false);
+
   useEffect(() => {
     loadUserData();
+    loadBrands();
   }, [userId]);
 
   const loadUserData = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://82.146.60.239/api/user-card/${userId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+      const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiBase}/api/user-card/${userId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
       });
 
       if (response.ok) {
         const data = await response.json();
         setUserData(data);
-      } else {
-        console.error('Failed to load user data');
+        if (data.device) {
+          setSelectedBrand(data.device.brand_id ? String(data.device.brand_id) : '');
+          setSelectedModel(data.device.model_id ? String(data.device.model_id) : '');
+          if (data.device.brand_id) loadModels(data.device.brand_id);
+        }
       }
     } catch (error) {
       console.error('Load user data error:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadBrands = async () => {
+    try {
+      const r = await deviceSettingsAPI.getBrands();
+      setBrands(r.data.brands || []);
+    } catch {}
+  };
+
+  const loadModels = async (brandId) => {
+    try {
+      const r = await deviceSettingsAPI.getModels(brandId);
+      setModels(r.data.models || []);
+    } catch {}
+  };
+
+  const handleBrandChange = (e) => {
+    const val = e.target.value;
+    setSelectedBrand(val);
+    setSelectedModel('');
+    setModels([]);
+    if (val) loadModels(val);
+  };
+
+  const handleDeviceSave = async () => {
+    setDeviceMsg(''); setDeviceErr(''); setDeviceSaving(true);
+    try {
+      const token = localStorage.getItem('token');
+      const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const res = await fetch(`${apiBase}/api/user-card/${userId}/device`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          category_id: selectedModel ? Number(selectedModel) : null
+        })
+      });
+      if (res.ok) {
+        setDeviceMsg('Настройки устройства сохранены');
+        loadUserData();
+      } else {
+        const d = await res.json();
+        setDeviceErr(d.error || 'Ошибка сохранения');
+      }
+    } catch {
+      setDeviceErr('Ошибка соединения');
+    }
+    setDeviceSaving(false);
   };
 
   const formatDate = (dateString) => {
@@ -155,9 +215,15 @@ const UserCard = () => {
           </div>
         </div>
 
-        {/* Вкладки с логами */}
+        {/* Вкладки */}
         <div className="logs-section">
           <div className="tabs">
+            <button
+              className={`tab ${activeTab === 'device' ? 'active' : ''}`}
+              onClick={() => setActiveTab('device')}
+            >
+              Устройство
+            </button>
             <button
               className={`tab ${activeTab === 'commands' ? 'active' : ''}`}
               onClick={() => setActiveTab('commands')}
@@ -173,6 +239,80 @@ const UserCard = () => {
           </div>
 
           <div className="tab-content">
+            {activeTab === 'device' && (
+              <div style={{padding:'16px 0'}}>
+                {userData.device ? (
+                  <>
+                    <div style={{display:'flex',gap:12,flexWrap:'wrap',marginBottom:20}}>
+                      {[
+                        {label:'Серийный номер', val: userData.device.serial_number},
+                        {label:'Статус', val: userData.device.is_active ? '● Активно' : '● Неактивно',
+                         color: userData.device.is_active ? '#10b981' : '#ef4444'},
+                        {label:'Последний выход', val: userData.device.last_seen
+                          ? new Date(userData.device.last_seen).toLocaleString('ru-RU') : '—'},
+                        {label:'Версия ПО', val: userData.device.fw_version || '—'},
+                      ].map(item => (
+                        <div key={item.label} style={{flex:1,minWidth:160,background:'#f9fafb',borderRadius:10,padding:'10px 14px',border:'1px solid #e5e7eb'}}>
+                          <div style={{fontSize:11,color:'#6b7280',marginBottom:3}}>{item.label}</div>
+                          <div style={{fontWeight:600,fontSize:13,color:item.color||'inherit'}}>{item.val}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div style={{display:'flex',gap:12,marginBottom:16,flexWrap:'wrap'}}>
+                      <div style={{flex:1,minWidth:160}}>
+                        <label style={{display:'block',marginBottom:6,fontSize:14,fontWeight:500}}>Марка автомобиля</label>
+                        <select value={selectedBrand} onChange={handleBrandChange}
+                          style={{width:'100%',padding:'8px 12px',border:'1px solid #d1d5db',borderRadius:8,fontSize:14}}>
+                          <option value="">— Не указана —</option>
+                          {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                        </select>
+                      </div>
+                      <div style={{flex:1,minWidth:160}}>
+                        <label style={{display:'block',marginBottom:6,fontSize:14,fontWeight:500}}>Модель автомобиля</label>
+                        <select value={selectedModel} onChange={e => setSelectedModel(e.target.value)}
+                          disabled={!selectedBrand || models.length === 0}
+                          style={{width:'100%',padding:'8px 12px',border:'1px solid #d1d5db',borderRadius:8,fontSize:14,opacity:(!selectedBrand||models.length===0)?0.5:1}}>
+                          <option value="">— Не указана —</option>
+                          {models.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                        </select>
+                      </div>
+                    </div>
+
+                    {userData.allCommands.length > 0 && (
+                      <div style={{marginBottom:16}}>
+                        <label style={{display:'block',marginBottom:8,fontSize:14,fontWeight:500}}>
+                          Доступные команды <span style={{fontWeight:400,color:'#6b7280',fontSize:12}}>(определяются маркой/моделью)</span>
+                        </label>
+                        <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                          {userData.allCommands.map(cmd => (
+                            <div key={cmd.id} style={{
+                              padding:'7px 14px',
+                              border:'2px solid #667eea',
+                              borderRadius:8,fontSize:13,fontWeight:500,
+                              background:'#eef2ff',color:'#3730a3'
+                            }}>
+                              {cmd.label}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {deviceMsg && <div className="success-message" style={{marginBottom:10}}>{deviceMsg}</div>}
+                    {deviceErr && <div className="error-message" style={{marginBottom:10}}>{deviceErr}</div>}
+
+                    <button onClick={handleDeviceSave} disabled={deviceSaving}
+                      className="btn btn-primary">
+                      {deviceSaving ? 'Сохранение...' : 'Сохранить настройки устройства'}
+                    </button>
+                  </>
+                ) : (
+                  <p style={{color:'#6b7280'}}>Устройство не привязано к этому аккаунту.</p>
+                )}
+              </div>
+            )}
+
             {activeTab === 'commands' && (
               <div className="logs-table-container">
                 <table className="logs-table">

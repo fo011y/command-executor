@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { usersAPI, telegramAPI } from '../api/api';
+import { usersAPI, telegramAPI, deviceSettingsAPI } from '../api/api';
 import './Profile.css';
 
 const Profile = () => {
@@ -11,10 +11,18 @@ const Profile = () => {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
+  // Устройство
+  const [deviceInfo, setDeviceInfo] = useState(null);
+  const [deviceCommands, setDeviceCommands] = useState([]);
+  const [deviceMsg, setDeviceMsg] = useState('');
+  const [deviceErr, setDeviceErr] = useState('');
+  const [cmdLoading, setCmdLoading] = useState(null);
+
   const [tgStatus, setTgStatus] = useState(null);
   const [tgCode, setTgCode] = useState(null);
   const [tgLoading, setTgLoading] = useState(false);
   const [tgMsg, setTgMsg] = useState('');
+  const [copied, setCopied] = useState(false);
 
   const [profileData, setProfileData] = useState({
     email: '',
@@ -30,7 +38,28 @@ const Profile = () => {
   useEffect(() => {
     loadProfile();
     loadTgStatus();
+    loadDeviceSettings();
   }, []);
+
+  const loadDeviceSettings = async () => {
+    try {
+      const r = await deviceSettingsAPI.getMyDevice();
+      setDeviceInfo(r.data.device);
+      setDeviceCommands(r.data.commands || []);
+    } catch {}
+  };
+
+  const handleExecuteCommand = async (commandId, label) => {
+    if (!confirm(`Выполнить команду "${label}"?`)) return;
+    setCmdLoading(commandId);
+    try {
+      await deviceSettingsAPI.executeCommand(commandId);
+      setDeviceMsg(`Команда "${label}" поставлена в очередь`);
+    } catch (e) {
+      setDeviceErr(e.response?.data?.error || 'Ошибка отправки команды');
+    }
+    setCmdLoading(null);
+  };
 
   const loadTgStatus = async () => {
     try {
@@ -360,6 +389,83 @@ const Profile = () => {
 
 
             <div className="form-section">
+              <h3>Моё устройство</h3>
+
+              {deviceInfo ? (
+                <>
+                  <div style={{display:'flex',gap:16,flexWrap:'wrap',marginBottom:16}}>
+                    <div style={{flex:1,minWidth:180,background:'#f9fafb',borderRadius:10,padding:'12px 16px',border:'1px solid #e5e7eb'}}>
+                      <div style={{fontSize:12,color:'#6b7280',marginBottom:4}}>Серийный номер</div>
+                      <div style={{fontWeight:700,fontSize:15}}>{deviceInfo.serial_number}</div>
+                    </div>
+                    <div style={{flex:1,minWidth:140,background:'#f9fafb',borderRadius:10,padding:'12px 16px',border:'1px solid #e5e7eb'}}>
+                      <div style={{fontSize:12,color:'#6b7280',marginBottom:4}}>Статус</div>
+                      <div style={{fontWeight:700,fontSize:15,color: deviceInfo.is_active ? '#10b981' : '#ef4444'}}>
+                        {deviceInfo.is_active ? '● Активно' : '● Неактивно'}
+                      </div>
+                    </div>
+                    <div style={{flex:1,minWidth:180,background:'#f9fafb',borderRadius:10,padding:'12px 16px',border:'1px solid #e5e7eb'}}>
+                      <div style={{fontSize:12,color:'#6b7280',marginBottom:4}}>Последний выход на связь</div>
+                      <div style={{fontWeight:600,fontSize:13}}>
+                        {deviceInfo.last_seen
+                          ? new Date(deviceInfo.last_seen).toLocaleString('ru-RU')
+                          : '—'}
+                      </div>
+                    </div>
+                    {deviceInfo.fw_version && (
+                      <div style={{flex:1,minWidth:120,background:'#f9fafb',borderRadius:10,padding:'12px 16px',border:'1px solid #e5e7eb'}}>
+                        <div style={{fontSize:12,color:'#6b7280',marginBottom:4}}>Версия ПО</div>
+                        <div style={{fontWeight:600,fontSize:13}}>{deviceInfo.fw_version}</div>
+                      </div>
+                    )}
+                    {(deviceInfo.car_brand || deviceInfo.car_model) && (
+                      <div style={{flex:1,minWidth:180,background:'#f9fafb',borderRadius:10,padding:'12px 16px',border:'1px solid #e5e7eb'}}>
+                        <div style={{fontSize:12,color:'#6b7280',marginBottom:4}}>Автомобиль</div>
+                        <div style={{fontWeight:600,fontSize:13}}>
+                          {[deviceInfo.car_brand, deviceInfo.car_model].filter(Boolean).join(' ')}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {deviceMsg && <div className="success-message" style={{marginBottom:12}}>{deviceMsg}</div>}
+                  {deviceErr && <div className="error-message" style={{marginBottom:12}}>{deviceErr}</div>}
+
+                  {deviceCommands.length > 0 && (
+                    <>
+                      <h4 style={{marginBottom:12,color:'#374151'}}>Доступные команды</h4>
+                      <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+                        {deviceCommands.map(cmd => (
+                          <button
+                            key={cmd.id}
+                            type="button"
+                            onClick={() => handleExecuteCommand(cmd.id, cmd.label)}
+                            disabled={cmdLoading === cmd.id || !deviceInfo.is_active}
+                            style={{
+                              padding:'10px 18px',
+                              background: cmdLoading === cmd.id ? '#9ca3af' : '#667eea',
+                              color:'white',border:'none',borderRadius:10,
+                              cursor: deviceInfo.is_active ? 'pointer' : 'not-allowed',
+                              fontWeight:600,fontSize:14,
+                              opacity: !deviceInfo.is_active ? 0.5 : 1
+                            }}
+                            title={cmd.description || cmd.label}
+                          >
+                            {cmdLoading === cmd.id ? '...' : cmd.label}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </>
+              ) : (
+                <p style={{color:'#6b7280',fontSize:14}}>
+                  Устройство не найдено. Убедитесь что серийный номер в профиле указан верно.
+                </p>
+              )}
+            </div>
+
+            <div className="form-section">
               <h3>Telegram</h3>
               {tgStatus?.linked ? (
                 <div>
@@ -387,7 +493,26 @@ const Profile = () => {
                       <p style={{fontWeight:600,marginBottom:8}}>Шаги для привязки:</p>
                       <p style={{marginBottom:8}}>1. Откройте бота: <a href={tgCode.bot_url} target="_blank" rel="noreferrer" style={{color:'#667eea',fontWeight:600}}>@{tgCode.bot_url.split('/')[3].split('?')[0]}</a></p>
                       <p style={{marginBottom:8}}>2. Отправьте боту команду:</p>
-                      <code style={{display:'block',padding:'8px 12px',background:'#e8eaf6',borderRadius:8,fontSize:14,marginBottom:8,wordBreak:'break-all'}}>{tgCode.command}</code>
+                      <div style={{position:'relative'}}>
+                        <code style={{display:'block',padding:'8px 12px',background:'#e8eaf6',borderRadius:8,fontSize:14,marginBottom:8,wordBreak:'break-all',paddingRight:48}}>{tgCode.command}</code>
+                        <button
+                          type="button"
+                          onClick={() => { navigator.clipboard.writeText(tgCode.command); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+                          style={{position:'absolute',top:4,right:4,background:copied?'var(--primary)':'var(--canvas-soft)',border:'none',borderRadius:'var(--r-sm)',padding:'4px 8px',cursor:'pointer',fontSize:13,fontWeight:600,color:copied?'var(--on-primary)':'var(--body)',transition:'all 0.2s'}}
+                          title="Скопировать команду"
+                        >
+                          {copied ? '✓' : '⎘'}
+                        </button>
+                      </div>
+                      <a
+                        href={tgCode.bot_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{display:'inline-block',marginBottom:8,background:'var(--primary)',color:'var(--on-primary)',padding:'8px 16px',borderRadius:'var(--r-xl)',fontWeight:700,fontSize:14,textDecoration:'none'}}
+                        onClick={() => navigator.clipboard.writeText(tgCode.command)}
+                      >
+                        Открыть бота и скопировать команду
+                      </a>
                       <p style={{color:'#ef4444',fontSize:12}}>⏱ Код действителен 15 минут</p>
                       <button type="button" className="btn" style={{marginTop:8,background:'#6b7280',color:'white',fontSize:13,padding:'6px 14px'}} onClick={handleTgGenerate}>
                         Обновить код

@@ -61,14 +61,78 @@ router.get('/:userId', authenticateToken, requireAdmin, async (req, res) => {
       [userId]
     );
 
+    // Устройство пользователя
+    const deviceResult = await pool.query(
+      `SELECT d.id, d.serial_number, d.is_active, d.last_seen, d.fw_version,
+              d.last_lat, d.last_lng, d.category_id,
+              model.id   as model_id,   model.name   as car_model,
+              brand.id   as brand_id,   brand.name   as car_brand
+       FROM devices d
+       LEFT JOIN categories model ON d.category_id = model.id
+       LEFT JOIN categories brand ON model.parent_id = brand.id
+       WHERE d.owner_id = $1`,
+      [userId]
+    );
+
+    // Команды по категории устройства (подкатегория → fallback на родительскую)
+    let deviceCommands = [];
+    let allCommands = [];
+    const dev = deviceResult.rows[0];
+    if (dev && dev.category_id) {
+      const cmdsResult = await pool.query(
+        `WITH eff AS (
+           SELECT CASE
+             WHEN EXISTS(SELECT 1 FROM commands WHERE category_id = $1 AND is_active = true)
+               THEN $1::int
+             ELSE (SELECT parent_id FROM categories WHERE id = $1)
+           END AS cat_id
+         )
+         SELECT c.id, c.name, c.label, c.description
+         FROM commands c, eff
+         WHERE c.category_id = eff.cat_id AND c.is_active = true
+         ORDER BY c.id`,
+        [dev.category_id]
+      );
+      allCommands = cmdsResult.rows;
+      deviceCommands = allCommands.map(c => c.id);
+    }
+
     res.json({
       user,
+      device: deviceResult.rows[0] || null,
+      deviceCommands,
+      allCommands,
       commandLogs: commandLogsResult.rows,
       loginLogs: loginLogsResult.rows,
       stats: statsResult.rows[0]
     });
   } catch (error) {
     console.error('Get user card error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Обновить марку/модель устройства пользователя
+router.put('/:userId/device', authenticateToken, requireAdmin, async (req, res) => {
+  const { userId } = req.params;
+  const { category_id } = req.body;
+
+  try {
+    const deviceResult = await pool.query(
+      'SELECT id FROM devices WHERE owner_id = $1',
+      [userId]
+    );
+    if (deviceResult.rows.length === 0)
+      return res.status(404).json({ error: 'Device not found' });
+
+    await pool.query(
+      'UPDATE devices SET category_id = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      [category_id || null, deviceResult.rows[0].id]
+    );
+
+    res.json({ message: 'Настройки устройства обновлены' });
+  } catch (error) {
+    console.error('Update device error:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });

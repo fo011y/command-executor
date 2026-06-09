@@ -13,7 +13,7 @@ const Profile = () => {
 
   // Устройство
   const [deviceInfo, setDeviceInfo] = useState(null);
-  const [deviceCommands, setDeviceCommands] = useState([]);
+  const [commandGroups, setCommandGroups] = useState([]);
   const [deviceMsg, setDeviceMsg] = useState('');
   const [deviceErr, setDeviceErr] = useState('');
   const [cmdLoading, setCmdLoading] = useState(null);
@@ -45,7 +45,7 @@ const Profile = () => {
     try {
       const r = await deviceSettingsAPI.getMyDevice();
       setDeviceInfo(r.data.device);
-      setDeviceCommands(r.data.commands || []);
+      setCommandGroups(r.data.command_groups || []);
     } catch {}
   };
 
@@ -431,30 +431,37 @@ const Profile = () => {
                   {deviceMsg && <div className="success-message" style={{marginBottom:12}}>{deviceMsg}</div>}
                   {deviceErr && <div className="error-message" style={{marginBottom:12}}>{deviceErr}</div>}
 
-                  {deviceCommands.length > 0 && (
+                  {commandGroups.length > 0 && (
                     <>
                       <h4 style={{marginBottom:12,color:'#374151'}}>Доступные команды</h4>
-                      <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
-                        {deviceCommands.map(cmd => (
-                          <button
-                            key={cmd.id}
-                            type="button"
-                            onClick={() => handleExecuteCommand(cmd.id, cmd.label)}
-                            disabled={cmdLoading === cmd.id || !deviceInfo.is_active}
-                            style={{
-                              padding:'10px 18px',
-                              background: cmdLoading === cmd.id ? '#9ca3af' : '#667eea',
-                              color:'white',border:'none',borderRadius:10,
-                              cursor: deviceInfo.is_active ? 'pointer' : 'not-allowed',
-                              fontWeight:600,fontSize:14,
-                              opacity: !deviceInfo.is_active ? 0.5 : 1
-                            }}
-                            title={cmd.description || cmd.label}
-                          >
-                            {cmdLoading === cmd.id ? '...' : cmd.label}
-                          </button>
-                        ))}
-                      </div>
+                      {commandGroups.map(group => (
+                        <div key={group.label} style={{marginBottom:16}}>
+                          <div style={{fontSize:13,fontWeight:600,color:'#6b7280',marginBottom:8,textTransform:'uppercase',letterSpacing:'0.05em'}}>
+                            {group.label}
+                          </div>
+                          <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+                            {group.commands.map(cmd => (
+                              <button
+                                key={cmd.id}
+                                type="button"
+                                onClick={() => handleExecuteCommand(cmd.id, cmd.label || cmd.name)}
+                                disabled={cmdLoading === cmd.id || !deviceInfo.is_active}
+                                style={{
+                                  padding:'10px 18px',
+                                  background: cmdLoading === cmd.id ? '#9ca3af' : '#667eea',
+                                  color:'white',border:'none',borderRadius:10,
+                                  cursor: deviceInfo.is_active ? 'pointer' : 'not-allowed',
+                                  fontWeight:600,fontSize:14,
+                                  opacity: !deviceInfo.is_active ? 0.5 : 1
+                                }}
+                                title={cmd.description || cmd.label || cmd.name}
+                              >
+                                {cmdLoading === cmd.id ? '...' : (cmd.label || cmd.name)}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
                     </>
                   )}
                 </>

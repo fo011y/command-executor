@@ -1,8 +1,24 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Component } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { deviceSettingsAPI } from '../api/api';
 import './UserCard.css';
+
+class ErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { error: null }; }
+  static getDerivedStateFromError(e) { return { error: e }; }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{padding:40,color:'#ef4444',fontFamily:'monospace'}}>
+          <b>Ошибка рендера:</b><br/>
+          {this.state.error.message}<br/>
+          <pre style={{fontSize:12,marginTop:12,whiteSpace:'pre-wrap'}}>{this.state.error.stack}</pre>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const UserCard = () => {
   const { userId } = useParams();
@@ -10,20 +26,10 @@ const UserCard = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [userData, setUserData] = useState(null);
-  const [activeTab, setActiveTab] = useState('info');
-
-  // Устройство
-  const [brands, setBrands] = useState([]);
-  const [models, setModels] = useState([]);
-  const [selectedBrand, setSelectedBrand] = useState('');
-  const [selectedModel, setSelectedModel] = useState('');
-  const [deviceMsg, setDeviceMsg] = useState('');
-  const [deviceErr, setDeviceErr] = useState('');
-  const [deviceSaving, setDeviceSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState('device');
 
   useEffect(() => {
     loadUserData();
-    loadBrands();
   }, [userId]);
 
   const loadUserData = async () => {
@@ -37,64 +43,14 @@ const UserCard = () => {
       if (response.ok) {
         const data = await response.json();
         setUserData(data);
-        if (data.device) {
-          setSelectedBrand(data.device.brand_id ? String(data.device.brand_id) : '');
-          setSelectedModel(data.device.model_id ? String(data.device.model_id) : '');
-          if (data.device.brand_id) loadModels(data.device.brand_id);
-        }
+      } else {
+        console.error('user-card response error:', response.status, await response.text());
       }
     } catch (error) {
       console.error('Load user data error:', error);
     } finally {
       setLoading(false);
     }
-  };
-
-  const loadBrands = async () => {
-    try {
-      const r = await deviceSettingsAPI.getBrands();
-      setBrands(r.data.brands || []);
-    } catch {}
-  };
-
-  const loadModels = async (brandId) => {
-    try {
-      const r = await deviceSettingsAPI.getModels(brandId);
-      setModels(r.data.models || []);
-    } catch {}
-  };
-
-  const handleBrandChange = (e) => {
-    const val = e.target.value;
-    setSelectedBrand(val);
-    setSelectedModel('');
-    setModels([]);
-    if (val) loadModels(val);
-  };
-
-  const handleDeviceSave = async () => {
-    setDeviceMsg(''); setDeviceErr(''); setDeviceSaving(true);
-    try {
-      const token = localStorage.getItem('token');
-      const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-      const res = await fetch(`${apiBase}/api/user-card/${userId}/device`, {
-        method: 'PUT',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          category_id: selectedModel ? Number(selectedModel) : null
-        })
-      });
-      if (res.ok) {
-        setDeviceMsg('Настройки устройства сохранены');
-        loadUserData();
-      } else {
-        const d = await res.json();
-        setDeviceErr(d.error || 'Ошибка сохранения');
-      }
-    } catch {
-      setDeviceErr('Ошибка соединения');
-    }
-    setDeviceSaving(false);
   };
 
   const formatDate = (dateString) => {
@@ -197,19 +153,19 @@ const UserCard = () => {
           <h2>Статистика</h2>
           <div className="stats-grid">
             <div className="stat-item">
-              <div className="stat-value">{userData.stats.successful_commands || 0}</div>
+              <div className="stat-value">{userData.stats?.successful_commands || 0}</div>
               <div className="stat-label">Успешных команд</div>
             </div>
             <div className="stat-item">
-              <div className="stat-value">{userData.stats.failed_commands || 0}</div>
+              <div className="stat-value">{userData.stats?.failed_commands || 0}</div>
               <div className="stat-label">Ошибок команд</div>
             </div>
             <div className="stat-item">
-              <div className="stat-value">{userData.stats.successful_logins || 0}</div>
+              <div className="stat-value">{userData.stats?.successful_logins || 0}</div>
               <div className="stat-label">Успешных входов</div>
             </div>
             <div className="stat-item">
-              <div className="stat-value">{userData.stats.failed_logins || 0}</div>
+              <div className="stat-value">{userData.stats?.failed_logins || 0}</div>
               <div className="stat-label">Неудачных входов</div>
             </div>
           </div>
@@ -228,13 +184,13 @@ const UserCard = () => {
               className={`tab ${activeTab === 'commands' ? 'active' : ''}`}
               onClick={() => setActiveTab('commands')}
             >
-              Логи команд ({userData.commandLogs.length})
+              Логи команд ({userData.commandLogs?.length || 0})
             </button>
             <button
               className={`tab ${activeTab === 'logins' ? 'active' : ''}`}
               onClick={() => setActiveTab('logins')}
             >
-              Логи авторизации ({userData.loginLogs.length})
+              Логи авторизации ({userData.loginLogs?.length || 0})
             </button>
           </div>
 
@@ -259,53 +215,33 @@ const UserCard = () => {
                       ))}
                     </div>
 
-                    <div style={{display:'flex',gap:12,marginBottom:16,flexWrap:'wrap'}}>
-                      <div style={{flex:1,minWidth:160}}>
-                        <label style={{display:'block',marginBottom:6,fontSize:14,fontWeight:500}}>Марка автомобиля</label>
-                        <select value={selectedBrand} onChange={handleBrandChange}
-                          style={{width:'100%',padding:'8px 12px',border:'1px solid #d1d5db',borderRadius:8,fontSize:14}}>
-                          <option value="">— Не указана —</option>
-                          {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                        </select>
-                      </div>
-                      <div style={{flex:1,minWidth:160}}>
-                        <label style={{display:'block',marginBottom:6,fontSize:14,fontWeight:500}}>Модель автомобиля</label>
-                        <select value={selectedModel} onChange={e => setSelectedModel(e.target.value)}
-                          disabled={!selectedBrand || models.length === 0}
-                          style={{width:'100%',padding:'8px 12px',border:'1px solid #d1d5db',borderRadius:8,fontSize:14,opacity:(!selectedBrand||models.length===0)?0.5:1}}>
-                          <option value="">— Не указана —</option>
-                          {models.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                        </select>
-                      </div>
-                    </div>
-
-                    {userData.allCommands.length > 0 && (
+                    {userData.commandGroups?.length > 0 && (
                       <div style={{marginBottom:16}}>
                         <label style={{display:'block',marginBottom:8,fontSize:14,fontWeight:500}}>
-                          Доступные команды <span style={{fontWeight:400,color:'#6b7280',fontSize:12}}>(определяются маркой/моделью)</span>
+                          Доступные команды <span style={{fontWeight:400,color:'#6b7280',fontSize:12}}>(определяются категориями устройства)</span>
                         </label>
-                        <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-                          {userData.allCommands.map(cmd => (
-                            <div key={cmd.id} style={{
-                              padding:'7px 14px',
-                              border:'2px solid #667eea',
-                              borderRadius:8,fontSize:13,fontWeight:500,
-                              background:'#eef2ff',color:'#3730a3'
-                            }}>
-                              {cmd.label}
+                        {userData.commandGroups.map(group => (
+                          <div key={group.label} style={{marginBottom:12}}>
+                            <div style={{fontSize:11,fontWeight:600,color:'#6b7280',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:6}}>
+                              {group.label}
                             </div>
-                          ))}
-                        </div>
+                            <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                              {group.commands.map(cmd => (
+                                <div key={cmd.id} style={{
+                                  padding:'7px 14px',
+                                  border:'2px solid #667eea',
+                                  borderRadius:8,fontSize:13,fontWeight:500,
+                                  background:'#eef2ff',color:'#3730a3'
+                                }}>
+                                  {cmd.name}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     )}
 
-                    {deviceMsg && <div className="success-message" style={{marginBottom:10}}>{deviceMsg}</div>}
-                    {deviceErr && <div className="error-message" style={{marginBottom:10}}>{deviceErr}</div>}
-
-                    <button onClick={handleDeviceSave} disabled={deviceSaving}
-                      className="btn btn-primary">
-                      {deviceSaving ? 'Сохранение...' : 'Сохранить настройки устройства'}
-                    </button>
                   </>
                 ) : (
                   <p style={{color:'#6b7280'}}>Устройство не привязано к этому аккаунту.</p>
@@ -326,12 +262,12 @@ const UserCard = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {userData.commandLogs.length === 0 ? (
+                    {(userData.commandLogs?.length || 0) === 0 ? (
                       <tr>
                         <td colSpan="5" className="no-data">Нет данных</td>
                       </tr>
                     ) : (
-                      userData.commandLogs.map((log) => (
+                      (userData.commandLogs || []).map((log) => (
                         <tr key={log.id}>
                           <td>{formatDate(log.executed_at)}</td>
                           <td>
@@ -388,12 +324,12 @@ const UserCard = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {userData.loginLogs.length === 0 ? (
+                    {(userData.loginLogs?.length || 0) === 0 ? (
                       <tr>
                         <td colSpan="4" className="no-data">Нет данных</td>
                       </tr>
                     ) : (
-                      userData.loginLogs.map((log) => (
+                      (userData.loginLogs || []).map((log) => (
                         <tr key={log.id}>
                           <td>{formatDate(log.created_at)}</td>
                           <td>{log.ip_address || '-'}</td>
@@ -417,4 +353,8 @@ const UserCard = () => {
   );
 };
 
-export default UserCard;
+const UserCardWithBoundary = () => (
+  <ErrorBoundary><UserCard /></ErrorBoundary>
+);
+
+export default UserCardWithBoundary;

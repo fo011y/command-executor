@@ -11,12 +11,8 @@ router.get('/', authenticateToken, async (req, res) => {
     try {
         const result = await pool.query(
             `SELECT d.id, d.serial_number, d.is_active, d.last_seen,
-                    d.last_lat, d.last_lng, d.fw_version, d.category_id,
-                    model.id   as model_id,   model.name   as car_model,
-                    brand.id   as brand_id,   brand.name   as car_brand
+                    d.last_lat, d.last_lng, d.fw_version
              FROM devices d
-             LEFT JOIN categories model ON d.category_id = model.id
-             LEFT JOIN categories brand ON model.parent_id = brand.id
              WHERE d.owner_id = $1`,
             [req.user.id]
         );
@@ -26,20 +22,55 @@ router.get('/', authenticateToken, async (req, res) => {
 
         const device = result.rows[0];
 
-        const cmdResult = device.category_id ? await pool.query(
-            `WITH eff AS (
-               SELECT CASE
-                 WHEN EXISTS(SELECT 1 FROM commands WHERE category_id = $1 AND is_active = true)
-                   THEN $1::int
-                 ELSE (SELECT parent_id FROM categories WHERE id = $1)
-               END AS cat_id
-             )
-             SELECT c.id, c.name, c.label, c.description
-             FROM commands c, eff
-             WHERE c.category_id = eff.cat_id AND c.is_active = true
-             ORDER BY c.id`,
-            [device.category_id]
-        ) : { rows: [] };
+        // Все категории привязанные к устройству
+        const catResult = await pool.query(
+            `SELECT dc.category_id,
+                    cat.name        AS cat_name,
+                    cat.parent_id,
+                    parent.name     AS parent_name
+             FROM device_categories dc
+             JOIN categories cat    ON dc.category_id = cat.id
+             LEFT JOIN categories parent ON cat.parent_id = parent.id
+             WHERE dc.device_id = $1 AND cat.is_active = true`,
+            [device.id]
+        );
+
+        // Для каждой категории определяем: есть ли команды у самой подкатегории,
+        // иначе берём команды родительской категории.
+        // Заголовок = подкатегория (если есть parent) или категория.
+        const groups = [];
+        for (const row of catResult.rows) {
+            const subCmds = await pool.query(
+                `SELECT id, name, label, description
+                 FROM commands
+                 WHERE category_id = $1 AND is_active = true
+                 ORDER BY sort_order ASC, id ASC`,
+                [row.category_id]
+            );
+
+            if (subCmds.rows.length > 0) {
+                // У подкатегории есть свои команды — показываем подкатегорию как заголовок
+                groups.push({ label: row.cat_name, commands: subCmds.rows });
+            } else if (row.parent_id) {
+                // Подкатегория без команд — берём команды родительской категории
+                const parentCmds = await pool.query(
+                    `SELECT id, name, label, description
+                     FROM commands
+                     WHERE category_id = $1 AND is_active = true
+                     ORDER BY sort_order ASC, id ASC`,
+                    [row.parent_id]
+                );
+                if (parentCmds.rows.length > 0) {
+                    groups.push({ label: row.parent_name, commands: parentCmds.rows });
+                }
+            }
+        }
+
+        // Дедупликация групп с одинаковым заголовком
+        const seen = new Map();
+        for (const g of groups) {
+            if (!seen.has(g.label)) seen.set(g.label, g);
+        }
 
         res.json({
             device: {
@@ -49,13 +80,9 @@ router.get('/', authenticateToken, async (req, res) => {
                 last_seen: device.last_seen,
                 last_lat: device.last_lat,
                 last_lng: device.last_lng,
-                fw_version: device.fw_version,
-                category_id: device.category_id,
-                brand_id: device.brand_id,
-                car_brand: device.car_brand,
-                car_model: device.car_model
+                fw_version: device.fw_version
             },
-            commands: cmdResult.rows
+            command_groups: [...seen.values()]
         });
     } catch (error) {
         console.error('Get device settings error:', error);

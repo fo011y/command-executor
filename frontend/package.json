@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "deploy": "vite build && cp -r dist/. /var/www/www-root/data/www/connect.gsmcanbox.ru/",
     "preview": "vite preview"
   },
   "dependencies": {

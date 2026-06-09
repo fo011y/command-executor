@@ -64,44 +64,65 @@ router.get('/:userId', authenticateToken, requireAdmin, async (req, res) => {
     // Устройство пользователя
     const deviceResult = await pool.query(
       `SELECT d.id, d.serial_number, d.is_active, d.last_seen, d.fw_version,
-              d.last_lat, d.last_lng, d.category_id,
-              model.id   as model_id,   model.name   as car_model,
-              brand.id   as brand_id,   brand.name   as car_brand
+              d.last_lat, d.last_lng
        FROM devices d
-       LEFT JOIN categories model ON d.category_id = model.id
-       LEFT JOIN categories brand ON model.parent_id = brand.id
        WHERE d.owner_id = $1`,
       [userId]
     );
 
-    // Команды по категории устройства (подкатегория → fallback на родительскую)
-    let deviceCommands = [];
-    let allCommands = [];
+    // Команды по категориям устройства (подкатегория → fallback на родительскую)
     const dev = deviceResult.rows[0];
-    if (dev && dev.category_id) {
-      const cmdsResult = await pool.query(
-        `WITH eff AS (
-           SELECT CASE
-             WHEN EXISTS(SELECT 1 FROM commands WHERE category_id = $1 AND is_active = true)
-               THEN $1::int
-             ELSE (SELECT parent_id FROM categories WHERE id = $1)
-           END AS cat_id
-         )
-         SELECT c.id, c.name, c.label, c.description
-         FROM commands c, eff
-         WHERE c.category_id = eff.cat_id AND c.is_active = true
-         ORDER BY c.id`,
-        [dev.category_id]
+    let commandGroups = [];
+    if (dev) {
+      const catResult = await pool.query(
+        `SELECT dc.category_id,
+                cat.name    AS cat_name,
+                cat.parent_id,
+                parent.name AS parent_name
+         FROM device_categories dc
+         JOIN categories cat    ON dc.category_id = cat.id
+         LEFT JOIN categories parent ON cat.parent_id = parent.id
+         WHERE dc.device_id = $1 AND cat.is_active = true`,
+        [dev.id]
       );
-      allCommands = cmdsResult.rows;
-      deviceCommands = allCommands.map(c => c.id);
+
+      for (const row of catResult.rows) {
+        const subCmds = await pool.query(
+          `SELECT id, name, description
+           FROM commands
+           WHERE category_id = $1 AND is_active = true
+           ORDER BY sort_order ASC, id ASC`,
+          [row.category_id]
+        );
+
+        if (subCmds.rows.length > 0) {
+          commandGroups.push({ label: row.cat_name, commands: subCmds.rows });
+        } else if (row.parent_id) {
+          const parentCmds = await pool.query(
+            `SELECT id, name, description
+             FROM commands
+             WHERE category_id = $1 AND is_active = true
+             ORDER BY sort_order ASC, id ASC`,
+            [row.parent_id]
+          );
+          if (parentCmds.rows.length > 0) {
+            commandGroups.push({ label: row.parent_name, commands: parentCmds.rows });
+          }
+        }
+      }
+
+      // Дедупликация по заголовку
+      const seen = new Map();
+      for (const g of commandGroups) {
+        if (!seen.has(g.label)) seen.set(g.label, g);
+      }
+      commandGroups = [...seen.values()];
     }
 
     res.json({
       user,
-      device: deviceResult.rows[0] || null,
-      deviceCommands,
-      allCommands,
+      device: dev || null,
+      commandGroups,
       commandLogs: commandLogsResult.rows,
       loginLogs: loginLogsResult.rows,
       stats: statsResult.rows[0]

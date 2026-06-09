@@ -1,162 +1,74 @@
-# Command Executor - Инструкция по установке на сервер
+# GCBox Connect — Инструкция по деплою
 
-## Вариант 1: Простая установка (рекомендуется)
+## Сервер
 
-### Шаг 1: Подключитесь к серверу
+- **IP:** 80.87.198.101
+- **User:** root
+- **Подключение:** `plink -ssh root@80.87.198.101 -pw "9nZprK42GB3g" -batch`
+- **Передача файлов:** `pscp -pw "9nZprK42GB3g" <src> root@80.87.198.101:<dst>`
+
+## Структура на сервере
+
+```
+/opt/connect.gsmcanbox.ru/
+├── backend/          ← Node.js исходники (рабочая копия)
+└── frontend/         ← React/Vite исходники (рабочая копия)
+    └── dist/         ← сборка (НЕ раздаётся nginx напрямую)
+
+/var/www/www-root/data/www/connect.gsmcanbox.ru/  ← nginx root (раздаётся браузеру)
+```
+
+> ⚠️ nginx раздаёт из `/var/www/...`, а НЕ из `/opt/.../dist/`. После сборки нужно копировать!
+
+## Деплой фронтенда
+
+### Загрузить изменённые файлы:
 ```bash
-ssh root@82.146.60.239
-# Пароль: nR7gT0dO8jcU
+pscp -pw "9nZprK42GB3g" frontend/src/components/MyFile.jsx root@80.87.198.101:/opt/connect.gsmcanbox.ru/frontend/src/components/MyFile.jsx
 ```
 
-### Шаг 2: Скачайте и запустите установочный скрипт
+### Собрать и задеплоить (на сервере):
 ```bash
-curl -o deploy.sh https://raw.githubusercontent.com/YOUR_REPO/command-executor/main/deploy.sh
-chmod +x deploy.sh
-sudo bash deploy.sh
+plink -ssh root@80.87.198.101 -pw "9nZprK42GB3g" -batch "cd /opt/connect.gsmcanbox.ru/frontend && npm run deploy"
 ```
 
-## Вариант 2: Ручная установка (если нет GitHub)
+`npm run deploy` = `vite build` + `cp -r dist/. /var/www/www-root/data/www/connect.gsmcanbox.ru/`
 
-### Шаг 1: Подключитесь к серверу через PuTTY или SSH
+## Деплой бэкенда
 
-### Шаг 2: Скопируйте и выполните команды:
-
+### Загрузить файл:
 ```bash
-# Создать скрипт установки
-cat > /tmp/quick-install.sh << 'SCRIPT_END'
-#!/bin/bash
-set -e
-
-echo "Установка Command Executor..."
-
-# Обновление системы
-apt update && apt upgrade -y
-
-# Установка Node.js
-curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-apt install -y nodejs
-
-# Установка PostgreSQL
-apt install -y postgresql postgresql-contrib nginx
-
-# Запуск PostgreSQL
-systemctl start postgresql
-systemctl enable postgresql
-
-# Создание БД
-DB_PASS=$(openssl rand -base64 20)
-sudo -u postgres psql << EOF
-CREATE DATABASE command_executor;
-CREATE USER cmd_user WITH PASSWORD '${DB_PASS}';
-GRANT ALL PRIVILEGES ON DATABASE command_executor TO cmd_user;
-ALTER DATABASE command_executor OWNER TO cmd_user;
-EOF
-
-echo "База данных создана!"
-echo "Пароль БД: ${DB_PASS}"
-echo "Сохраните этот пароль!"
-
-# Создание директории
-mkdir -p /var/www/command-executor
-cd /var/www/command-executor
-
-echo "Теперь загрузите файлы проекта в /var/www/command-executor"
-echo "Используйте WinSCP или FileZilla"
-
-SCRIPT_END
-
-chmod +x /tmp/quick-install.sh
-sudo bash /tmp/quick-install.sh
+pscp -pw "9nZprK42GB3g" backend/routes/myRoute.js root@80.87.198.101:/opt/connect.gsmcanbox.ru/backend/routes/myRoute.js
 ```
 
-## Вариант 3: Загрузка файлов с вашего компьютера
-
-### На Windows (PowerShell):
-
-```powershell
-# Установите WinSCP или используйте pscp (PuTTY)
-# Скачайте: https://winscp.net/
-
-# Или используйте pscp из командной строки:
-cd C:\1\command-executor
-
-# Загрузка backend
-pscp -r backend root@82.146.60.239:/var/www/command-executor/
-
-# Загрузка frontend  
-pscp -r frontend root@82.146.60.239:/var/www/command-executor/
-```
-
-### Или используйте Git Bash:
-
+### Перезапустить:
 ```bash
-cd /c/1/command-executor
-
-# Создать архив
-tar -czf command-executor.tar.gz backend frontend
-
-# Загрузить на сервер (потребуется ввести пароль)
-scp command-executor.tar.gz root@82.146.60.239:/tmp/
-
-# Затем на сервере:
-# ssh root@82.146.60.239
-# cd /var/www
-# tar -xzf /tmp/command-executor.tar.gz
+plink -ssh root@80.87.198.101 -pw "9nZprK42GB3g" -batch "pm2 restart command-executor"
 ```
 
-## Вариант 4: Самый простой - я создам все файлы на сервере
+## PM2 процессы
 
-Выполните эти команды на сервере (скопируйте всё целиком):
+| ID | Имя | Описание |
+|----|-----|----------|
+| 3 | command-executor | Backend API (порт 5000) |
+| 4 | gcb-bot | Telegram бот |
+| 2 | gsmcanbox-api | gsmcanbox.ru backend |
 
-```bash
-# Будет создан полный установочный скрипт
-# Просто скопируйте и вставьте в терминал сервера
-```
+## Nginx конфиг
 
----
+`/etc/nginx/vhosts/www-root/connect.gsmcanbox.ru.conf`
 
-## После установки файлов:
+- root → `/var/www/www-root/data/www/connect.gsmcanbox.ru`
+- `/api/` → proxy `http://localhost:5000`
+- `/socket.io/` → proxy `http://localhost:5000`
+- SPA: `try_files $uri $uri/ /index.html`
 
-```bash
-cd /var/www/command-executor/backend
+## База данных
 
-# Создать .env файл
-nano .env
-# Вставьте настройки БД из вывода скрипта
+- **БД:** PostgreSQL на localhost
+- **Конфиг:** `/opt/connect.gsmcanbox.ru/backend/.env`
 
-# Установить зависимости
-npm install
+## GitHub
 
-# Инициализировать БД
-node scripts/initDb.js
-
-# Собрать frontend
-cd ../frontend
-npm install
-npm run build
-
-# Настроить Nginx
-# (конфиг будет создан автоматически)
-
-# Запустить с PM2
-npm install -g pm2
-cd ../backend
-pm2 start server.js --name command-executor
-pm2 startup
-pm2 save
-```
-
-## Проверка
-
-Откройте в браузере: http://82.146.60.239
-
-Логин: admin@example.com
-Пароль: admin123
-
----
-
-## Какой вариант выбрать?
-
-**Самый простой**: Я создам один большой скрипт, который создаст все файлы проекта прямо на сервере. Вам нужно будет только скопировать его и запустить.
-
-Хотите, чтобы я создал такой скрипт?
+- **Repo:** `fo011y/gcb-connect`
+- **Ветка:** `master`

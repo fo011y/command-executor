@@ -1,4 +1,43 @@
-# GCBox Connect — Changelog
+# GCB Connect — Changelog
+
+---
+
+## 2026-06-20
+
+### Android-приложение (Flutter)
+
+**Новый модуль `mobile/`** — полноценный Flutter-клиент для Android:
+
+#### Архитектура
+- `lib/api/` — HTTP-клиент на Dio с авто-подстановкой JWT; отдельные классы `AuthApi`, `CommandsApi`, `ProfileApi`
+- `lib/providers/` — Provider-based state: `AuthProvider`, `CommandsProvider`, `ProfileProvider`, `SettingsProvider`
+- `lib/services/` — `SocketService` (Socket.io), `SettingsService` (локальные настройки в secure storage)
+- `lib/models/` — `User`, `Command`, `CommandLog`, `CarSettings`
+
+#### Экраны
+- **LoginScreen** — вход по email/паролю, обработка 403 (неактивный аккаунт)
+- **DashboardScreen** — список команд по категориям, силуэт авто, real-time статус
+- **ProfileScreen** — просмотр и редактирование профиля (email, телефоны)
+- **CarSettingsScreen** — выбор модели авто, цвета кузова, расположения кнопок
+
+#### UI/UX
+- Силуэт автомобиля на главном экране (`CustomPainter`): Ford Focus 3 и Ford Kuga 2
+- Кнопки команд в стиле иконок приложений: квадратные с закруглениями, градиент, тень, иконка по смыслу команды
+- Выбор расположения кнопок: над или под изображением автомобиля
+- Выбор цвета кузова (12 цветов), настройки сохраняются локально
+- Тёмная тема в стиле GitHub Dark (`#0d1117` / `#161b22`)
+- Иконка приложения — логотип gsmcanbox
+
+#### Технические детали
+- Сервер: `https://connect.gsmcanbox.ru` (HTTPS через Nginx)
+- JWT хранится в `flutter_secure_storage`
+- WebSocket подключается автоматически после логина
+- Статус выполнения команды обновляется через Socket.io (`command:result`)
+- APK: `mobile/build/app/outputs/flutter-apk/app-debug.apk`
+
+### Исправления бэкенда
+
+- **`userController.js`** — исправлен баг: `phone2` и `phone3` не сохранялись при обновлении профиля (поля не были добавлены в UPDATE-запрос)
 
 ---
 

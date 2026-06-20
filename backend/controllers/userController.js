@@ -97,6 +97,18 @@ export const updateUser = async (req, res) => {
       paramCount++;
     }
 
+    if (phone2 !== undefined) {
+      updates.push(`phone2 = $${paramCount}`);
+      values.push(phone2);
+      paramCount++;
+    }
+
+    if (phone3 !== undefined) {
+      updates.push(`phone3 = $${paramCount}`);
+      values.push(phone3);
+      paramCount++;
+    }
+
     if (module_serial !== undefined) {
       updates.push(`module_serial = $${paramCount}`);
       values.push(module_serial);

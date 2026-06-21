@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { usersAPI, commandsAPI, categoriesAPI, devicesAPI, firmwareAPI, emailSettingsAPI } from '../api/api';
+import { usersAPI, commandsAPI, categoriesAPI, devicesAPI, firmwareAPI, emailSettingsAPI, notificationsAPI } from '../api/api';
 import { onEvent, offEvent } from '../api/socket';
 import './AdminPanel.css';
 
@@ -415,6 +415,12 @@ const AdminPanel = () => {
           >
             Почта
           </button>
+          <button
+            className={`tab ${activeTab === 'notifications' ? 'active' : ''}`}
+            onClick={() => setActiveTab('notifications')}
+          >
+            Уведомления
+          </button>
         </div>
 
         <div className="tab-content">
@@ -476,6 +482,9 @@ const AdminPanel = () => {
 
               {activeTab === 'email' && (
                 <EmailTab />
+              )}
+              {activeTab === 'notifications' && (
+                <NotificationsTab />
               )}
             </>
           )}
@@ -1612,6 +1621,150 @@ const EmailTab = () => {
             <li>Пользователю — при активации или деактивации аккаунта</li>
           </ul>
         </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── Notifications Tab ───────────────────────────────────────────────────────
+const NotificationsTab = () => {
+  const [users, setUsers] = useState([]);
+  const [selectedUser, setSelectedUser] = useState('');
+  const [title, setTitle] = useState('');
+  const [body, setBody] = useState('');
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState(null);
+  const [tokens, setTokens] = useState([]);
+
+  useEffect(() => {
+    usersAPI.getAll().then(r => setUsers(r.data.users || [])).catch(() => {});
+    notificationsAPI.getTokens().then(r => setTokens(r.data.tokens || [])).catch(() => {});
+  }, []);
+
+  const handleSend = async (e) => {
+    e.preventDefault();
+    if (!title.trim() || !body.trim()) return;
+    setSending(true);
+    setResult(null);
+    try {
+      const res = await notificationsAPI.send({
+        title: title.trim(),
+        body: body.trim(),
+        user_id: selectedUser || undefined,
+      });
+      setResult({ ok: true, text: `Отправлено: ${res.data.sent} устройств` });
+      setTitle('');
+      setBody('');
+    } catch (err) {
+      setResult({ ok: false, text: err.response?.data?.error || 'Ошибка отправки' });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="email-settings-tab">
+      <h3>Push-уведомления</h3>
+      <p style={{ color: '#6b7280', fontSize: 13, marginBottom: 20 }}>
+        Отправка push-уведомлений в Android-приложение через Firebase Cloud Messaging.
+      </p>
+
+      <form onSubmit={handleSend} className="email-form">
+        <div className="form-group">
+          <label>Получатель</label>
+          <select
+            value={selectedUser}
+            onChange={e => setSelectedUser(e.target.value)}
+            className="form-control"
+          >
+            <option value="">Все пользователи ({tokens.length} устройств)</option>
+            {users.map(u => {
+              const count = tokens.filter(t => t.email === u.email).length;
+              return (
+                <option key={u.id} value={u.id}>
+                  {u.email} ({count} устройств)
+                </option>
+              );
+            })}
+          </select>
+        </div>
+
+        <div className="form-group">
+          <label>Заголовок *</label>
+          <input
+            type="text"
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            placeholder="Например: Внимание!"
+            maxLength={100}
+            required
+          />
+        </div>
+
+        <div className="form-group">
+          <label>Текст уведомления *</label>
+          <textarea
+            value={body}
+            onChange={e => setBody(e.target.value)}
+            placeholder="Текст push-уведомления..."
+            rows={3}
+            maxLength={500}
+            required
+            style={{ resize: 'vertical' }}
+          />
+        </div>
+
+        <button type="submit" className="btn btn-primary" disabled={sending}>
+          {sending ? 'Отправка...' : 'Отправить уведомление'}
+        </button>
+
+        {result && (
+          <div className={`fw-msg ${result.ok ? 'fw-msg-ok' : 'fw-msg-error'}`} style={{ marginTop: 12 }}>
+            {result.text}
+          </div>
+        )}
+      </form>
+
+      <div style={{ marginTop: 28 }}>
+        <h4 style={{ marginBottom: 12 }}>Зарегистрированные устройства ({tokens.length})</h4>
+        {tokens.length === 0 ? (
+          <p style={{ color: '#9ca3af', fontSize: 13 }}>
+            Нет зарегистрированных устройств. Устройство регистрируется при первом входе в приложение.
+          </p>
+        ) : (
+          <table className="users-table">
+            <thead>
+              <tr>
+                <th>Пользователь</th>
+                <th>FCM токен</th>
+                <th>Обновлён</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tokens.map(t => (
+                <tr key={t.id}>
+                  <td>{t.email}</td>
+                  <td style={{ fontFamily: 'monospace', fontSize: 11, color: '#6b7280' }}>
+                    {t.token.substring(0, 30)}...
+                  </td>
+                  <td>{new Date(t.updated_at).toLocaleString('ru')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <div style={{ marginTop: 24, padding: 16, background: '#f9fafb', borderRadius: 10, fontSize: 13, color: '#6b7280' }}>
+        <b>Как настроить FCM:</b>
+        <ol style={{ margin: '8px 0 0', paddingLeft: 20, lineHeight: 1.9 }}>
+          <li>Создать проект в <a href="https://console.firebase.google.com" target="_blank" rel="noreferrer">Firebase Console</a></li>
+          <li>Добавить Android-приложение с пакетом <code>com.gcbconnect.gcbconnect</code></li>
+          <li>Скачать <code>google-services.json</code> → положить в <code>mobile/android/app/</code></li>
+          <li>В Project Settings → Cloud Messaging → скопировать Server Key</li>
+          <li>Добавить в <code>.env</code> сервера: <code>FCM_SERVER_KEY=ваш_ключ</code></li>
+          <li>Пересобрать APK и перезапустить сервер</li>
+        </ol>
       </div>
     </div>
   );

@@ -1,22 +1,22 @@
 import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import '../models/car_settings.dart';
+import '../models/app_settings.dart';
 
 const _storage = FlutterSecureStorage();
-const _key = 'car_settings';
+const _key = 'app_settings';
 
 class SettingsService {
-  Future<CarSettings> load() async {
+  Future<AppSettings> load() async {
     try {
       final raw = await _storage.read(key: _key);
-      if (raw == null) return const CarSettings();
-      return CarSettings.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+      if (raw == null) return const AppSettings();
+      return AppSettings.fromJson(jsonDecode(raw) as Map<String, dynamic>);
     } catch (_) {
-      return const CarSettings();
+      return const AppSettings();
     }
   }
 
-  Future<void> save(CarSettings settings) async {
+  Future<void> save(AppSettings settings) async {
     await _storage.write(key: _key, value: jsonEncode(settings.toJson()));
   }
 }

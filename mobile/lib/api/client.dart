@@ -11,7 +11,10 @@ Dio buildDio() {
     baseUrl: '$kApiBase/api',
     connectTimeout: const Duration(seconds: 10),
     receiveTimeout: const Duration(seconds: 15),
-    headers: {'Content-Type': 'application/json'},
+    headers: {
+      'Content-Type': 'application/json',
+      'User-Agent': 'GCBox Connect/1.0 (Android; chkaaaaaaa)',
+    },
   ));
 
   dio.interceptors.add(InterceptorsWrapper(

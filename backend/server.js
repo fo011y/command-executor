@@ -19,6 +19,7 @@ import telegramLinkRoutes from './routes/telegramLink.js';
 import botExecuteRoutes from './routes/botExecute.js';
 import deviceApiRoutes from './routes/deviceApi.js';
 import deviceSettingsRoutes from './routes/deviceSettings.js';
+import notificationRoutes from './routes/notifications.js';
 import { startFirmwareCron } from './scripts/firmwareCron.js';
 
 dotenv.config();
@@ -62,6 +63,7 @@ app.use('/api/telegram', telegramLinkRoutes);
 app.use('/api/bot', botExecuteRoutes);
 app.use('/api/device', deviceApiRoutes);
 app.use('/api/device-settings', deviceSettingsRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Базовый маршрут
 app.get('/', (req, res) => {

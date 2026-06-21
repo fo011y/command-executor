@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "350693853821",
+    "project_id": "gcbox-connect-34d9c",
+    "storage_bucket": "gcbox-connect-34d9c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:350693853821:android:30eb1c121c3083dbee7f14",
+        "android_client_info": {
+          "package_name": "com.gcbconnect.gcbconnect"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA4fV_QdNRTlX7kfe7I3iEWGEqYonE5SgI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

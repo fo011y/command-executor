@@ -41,7 +41,7 @@ router.get('/', authenticateToken, async (req, res) => {
         const groups = [];
         for (const row of catResult.rows) {
             const subCmds = await pool.query(
-                `SELECT id, name, label, description
+                `SELECT id, name, description
                  FROM commands
                  WHERE category_id = $1 AND is_active = true
                  ORDER BY sort_order ASC, id ASC`,
@@ -54,7 +54,7 @@ router.get('/', authenticateToken, async (req, res) => {
             } else if (row.parent_id) {
                 // Подкатегория без команд — берём команды родительской категории
                 const parentCmds = await pool.query(
-                    `SELECT id, name, label, description
+                    `SELECT id, name, description
                      FROM commands
                      WHERE category_id = $1 AND is_active = true
                      ORDER BY sort_order ASC, id ASC`,

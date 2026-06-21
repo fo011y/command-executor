@@ -38,8 +38,8 @@ api.interceptors.response.use(
 
 // Auth API
 export const authAPI = {
-  register: (email, password, serial_number) =>
-    api.post('/auth/register', { email, password, serial_number }),
+  register: (email, password, serial_number, phone) =>
+    api.post('/auth/register', { email, password, serial_number, phone }),
 
   login: (email, password) =>
     api.post('/auth/login', { email, password }),
@@ -210,6 +210,11 @@ export const deviceSettingsAPI = {
     setDeviceCommands: (deviceId, command_ids) =>
       api.put(`/device-settings/admin/devices/${deviceId}/commands`, { command_ids })
   }
+};
+
+export const notificationsAPI = {
+  send: (data) => api.post('/notifications/send', data),
+  getTokens: () => api.get('/notifications/tokens'),
 };
 
 export default api;

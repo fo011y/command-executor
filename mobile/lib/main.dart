@@ -1,3 +1,4 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -7,16 +8,21 @@ import 'api/commands_api.dart';
 import 'api/profile_api.dart';
 import 'providers/auth_provider.dart';
 import 'providers/commands_provider.dart';
+import 'providers/notifications_provider.dart';
 import 'providers/profile_provider.dart';
 import 'providers/settings_provider.dart';
-import 'screens/car_settings_screen.dart';
+import 'screens/app_settings_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/notifications_screen.dart';
 import 'screens/profile_screen.dart';
+import 'services/push_service.dart';
 import 'services/settings_service.dart';
 import 'services/socket_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
   runApp(const GcbConnectApp());
 }
 
@@ -28,6 +34,10 @@ class GcbConnectApp extends StatelessWidget {
     final dio = buildDio();
     final socketService = SocketService();
     final settingsService = SettingsService();
+    final notificationsProvider = NotificationsProvider()..load();
+
+    PushService.setNotificationsProvider(notificationsProvider);
+    PushService.init(dio);
 
     return MultiProvider(
       providers: [
@@ -43,14 +53,15 @@ class GcbConnectApp extends StatelessWidget {
         ChangeNotifierProvider(
           create: (_) => SettingsProvider(settingsService)..load(),
         ),
+        ChangeNotifierProvider.value(value: notificationsProvider),
       ],
       child: MaterialApp(
         title: 'GCB Connect',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
-          colorScheme: ColorScheme.dark(
-            primary: const Color(0xFF4CAF50),
-            surface: const Color(0xFF161b22),
+          colorScheme: const ColorScheme.dark(
+            primary: Color(0xFF4CAF50),
+            surface: Color(0xFF161b22),
           ),
           scaffoldBackgroundColor: const Color(0xFF0d1117),
           useMaterial3: true,
@@ -61,9 +72,12 @@ class GcbConnectApp extends StatelessWidget {
             case '/profile':
               return MaterialPageRoute(
                   builder: (_) => const ProfileScreen());
-            case '/car-settings':
+            case '/app-settings':
               return MaterialPageRoute(
-                  builder: (_) => const CarSettingsScreen());
+                  builder: (_) => const AppSettingsScreen());
+            case '/notifications':
+              return MaterialPageRoute(
+                  builder: (_) => const NotificationsScreen());
             default:
               return MaterialPageRoute(
                   builder: (_) => const _RootRedirect());
@@ -88,7 +102,7 @@ class _RootRedirect extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.directions_car_rounded,
+              Icon(Icons.notifications_rounded,
                   size: 64, color: Color(0xFF4CAF50)),
               SizedBox(height: 24),
               CircularProgressIndicator(color: Color(0xFF4CAF50)),

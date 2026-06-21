@@ -139,15 +139,6 @@ const Profile = () => {
     return '+375 ';
   };
 
-  const formatSerial = (value) => {
-    const cleaned = value.replace(/[^A-Z0-9]/gi, '').toUpperCase();
-    let formatted = cleaned.startsWith('GCB') ? cleaned : 'GCB' + cleaned;
-    formatted = formatted.replace(/^(GCB)+/, 'GCB');
-    const gcbPart = 'GCB';
-    const numberPart = formatted.slice(3).replace(/\D/g, '').slice(0, 9);
-    return numberPart.length > 0 ? `${gcbPart}-${numberPart}` : gcbPart;
-  };
-
   const handlePhoneChange = (e) => {
     const formatted = formatPhone(e.target.value);
     setProfileData({ ...profileData, phone: formatted });
@@ -166,12 +157,6 @@ const Profile = () => {
     setError('');
   };
 
-  const handleSerialChange = (e) => {
-    const formatted = formatSerial(e.target.value);
-    setProfileData({ ...profileData, module_serial: formatted });
-    setError('');
-  };
-
   const validatePhone = (phone) => {
     const phoneRegex = /^\+7 \d{3} \d{3} \d{2} \d{2}$/;
     return phoneRegex.test(phone);
@@ -182,20 +167,10 @@ const Profile = () => {
     return phoneRegex.test(phone);
   };
 
-  const validateSerial = (serial) => {
-    const serialRegex = /^GCB-\d{9}$/;
-    return serialRegex.test(serial);
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setMessage('');
-
-    if (!validatePhone(profileData.phone)) {
-      setError('Неверный формат первого номера телефона. Используйте формат: +7 123 456 78 90');
-      return;
-    }
 
     if (profileData.phone2 && profileData.phone2.trim() !== '' && !validatePhone(profileData.phone2)) {
       setError('Неверный формат второго номера телефона. Используйте формат: +7 123 456 78 90');
@@ -204,11 +179,6 @@ const Profile = () => {
 
     if (profileData.phone3 && profileData.phone3.trim() !== '' && !validatePhone3(profileData.phone3)) {
       setError('Неверный формат третьего номера телефона. Используйте формат: +375 11 222 33 44');
-      return;
-    }
-
-    if (!validateSerial(profileData.module_serial)) {
-      setError('Неверный формат серийного номера. Используйте формат: GCB-123456789');
       return;
     }
 
@@ -232,10 +202,8 @@ const Profile = () => {
 
     try {
       const updateData = {
-        phone: profileData.phone,
         phone2: profileData.phone2,
-        phone3: profileData.phone3,
-        module_serial: profileData.module_serial
+        phone3: profileData.phone3
       };
 
       if (profileData.new_password) {
@@ -297,17 +265,13 @@ const Profile = () => {
               </div>
 
               <div className="form-group">
-                <label>
-                  Номер телефона <span style={{color: '#e74c3c'}}>*</span>
-                </label>
+                <label>Номер телефона</label>
                 <input
                   type="text"
                   value={profileData.phone}
-                  onChange={handlePhoneChange}
-                  placeholder="+7 123 456 78 90"
-                  required
+                  disabled
+                  className="input-disabled"
                 />
-                <small style={{color: '#999', fontSize: '12px'}}>Формат: +7 123 456 78 90</small>
               </div>
 
               <div className="form-group">
@@ -333,18 +297,13 @@ const Profile = () => {
               </div>
 
               <div className="form-group">
-                <label>
-                  Серийный номер <span style={{color: '#e74c3c'}}>*</span>
-                </label>
+                <label>Серийный номер устройства</label>
                 <input
                   type="text"
                   value={profileData.module_serial}
-                  onChange={handleSerialChange}
-                  placeholder="GCB-123456789"
-                  required
-                  title="Серийный номер начинается с GCB-123456789"
+                  disabled
+                  className="input-disabled"
                 />
-                <small style={{color: '#999', fontSize: '12px'}}>Формат: GCB-123456789</small>
               </div>
             </div>
 
@@ -467,7 +426,7 @@ const Profile = () => {
                 </>
               ) : (
                 <p style={{color:'#6b7280',fontSize:14}}>
-                  Устройство не найдено. Убедитесь что серийный номер в профиле указан верно.
+                  Устройство не найдено. Обратитесь к администратору.
                 </p>
               )}
             </div>

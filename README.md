@@ -108,7 +108,7 @@ flutter build apk --debug
 
 ### Аутентификация
 ```
-POST /api/auth/register      — регистрация (email, password, serial_number)
+POST /api/auth/register      — регистрация (email, password, serial_number, phone)
 POST /api/auth/login         — вход → { token, user }
 GET  /api/auth/me            — текущий пользователь
 ```
@@ -122,8 +122,10 @@ POST /api/commands/:id/execute — выполнить команду
 ### Пользователь
 ```
 GET  /api/users/me           — профиль
-PUT  /api/users/me           — обновить (email, phone, phone2, phone3, password)
+PUT  /api/users/me           — обновить (phone2, phone3, password)
 ```
+
+> Email, основной телефон и серийный номер устройства назначаются при регистрации и не могут быть изменены пользователем.
 
 ### Устройство (X-Device-Token)
 ```

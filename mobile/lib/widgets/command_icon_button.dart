@@ -1,31 +1,49 @@
 import 'package:flutter/material.dart';
 import '../models/command.dart';
 
-// Maps command name keywords to icons
 IconData _iconForCommand(String name) {
   final n = name.toLowerCase();
-  if (n.contains('замок') || n.contains('lock') || n.contains('закр')) {
-    return Icons.lock_rounded;
+
+  // Двигатель — запуск vs остановка
+  if (n.contains('запус') || n.contains('старт') || n.contains('start')) {
+    return Icons.play_circle_rounded;
   }
-  if (n.contains('откр') || n.contains('unlock') || n.contains('дверь') || n.contains('door')) {
-    return Icons.lock_open_rounded;
-  }
-  if (n.contains('старт') || n.contains('start') || n.contains('запус') || n.contains('двигат')) {
-    return Icons.power_settings_new_rounded;
-  }
-  if (n.contains('стоп') || n.contains('stop') || n.contains('заглу')) {
+  if (n.contains('остан') || n.contains('заглу') || n.contains('стоп') || n.contains('stop')) {
     return Icons.stop_circle_rounded;
   }
+
+  // Двери — открыть vs закрыть
+  if (n.contains('откр') || n.contains('unlock')) {
+    return Icons.lock_open_rounded;
+  }
+  if (n.contains('закр') || n.contains('lock') || n.contains('замок')) {
+    return Icons.lock_rounded;
+  }
+
+  // Стёкла — поднять vs опустить
+  if (n.contains('подн') && (n.contains('стекл') || n.contains('окно') || n.contains('window'))) {
+    return Icons.arrow_circle_up_rounded;
+  }
+  if ((n.contains('опус') || n.contains('опуст')) && (n.contains('стекл') || n.contains('окно') || n.contains('window'))) {
+    return Icons.arrow_circle_down_rounded;
+  }
+  if (n.contains('стекл') || n.contains('окно') || n.contains('window')) {
+    return Icons.table_rows_rounded;
+  }
+
+  // Двойное запирание
+  if (n.contains('двойн')) {
+    return Icons.enhanced_encryption_rounded;
+  }
+
+  // Прочее
   if (n.contains('trunk') || n.contains('багаж') || n.contains('капот')) {
     return Icons.inventory_2_rounded;
-  }
-  if (n.contains('окно') || n.contains('window') || n.contains('стекл')) {
-    return Icons.window_rounded;
   }
   if (n.contains('свет') || n.contains('light') || n.contains('фар')) {
     return Icons.light_mode_rounded;
   }
-  if (n.contains('сигнал') || n.contains('signal') || n.contains('alarm') || n.contains('охран')) {
+  if (n.contains('сигнал') || n.contains('alarm') || n.contains('охран')) {
     return Icons.security_rounded;
   }
   if (n.contains('темп') || n.contains('климат') || n.contains('climate') || n.contains('печ')) {
@@ -37,36 +55,54 @@ IconData _iconForCommand(String name) {
   return Icons.touch_app_rounded;
 }
 
-Color _colorForStatus(CommandExecutionStatus status) {
-  switch (status) {
-    case CommandExecutionStatus.success:
-      return const Color(0xFF4CAF50);
-    case CommandExecutionStatus.error:
-      return const Color(0xFFE53935);
-    case CommandExecutionStatus.loading:
-      return const Color(0xFF1565C0);
-    case CommandExecutionStatus.idle:
-      return const Color(0xFF1E3A5F);
-  }
-}
-
 class CommandIconButton extends StatelessWidget {
   final Command command;
   final CommandExecution? execution;
   final VoidCallback onTap;
+  final Color accentColor;
 
   const CommandIconButton({
     super.key,
     required this.command,
     required this.execution,
     required this.onTap,
+    required this.accentColor,
   });
+
+  Color _idleColor() {
+    final n = command.name.toLowerCase();
+    if (n.contains('остан') || n.contains('заглу') || n.contains('стоп') || n.contains('stop')) {
+      return const Color(0xFFB71C1C);
+    }
+    if (n.contains('двойн')) {
+      return const Color(0xFF1565C0);
+    }
+    if (n.contains('подн') && (n.contains('стекл') || n.contains('окно'))) {
+      return const Color(0xFF00695C);
+    }
+    if ((n.contains('опус') || n.contains('опуст')) && (n.contains('стекл') || n.contains('окно'))) {
+      return const Color(0xFF4527A0);
+    }
+    return accentColor;
+  }
 
   @override
   Widget build(BuildContext context) {
     final status = execution?.status ?? CommandExecutionStatus.idle;
     final isLoading = status == CommandExecutionStatus.loading;
-    final bgColor = _colorForStatus(status);
+
+    Color bgColor;
+    switch (status) {
+      case CommandExecutionStatus.success:
+        bgColor = const Color(0xFF2E7D32);
+      case CommandExecutionStatus.error:
+        bgColor = const Color(0xFFC62828);
+      case CommandExecutionStatus.loading:
+        bgColor = _idleColor().withValues(alpha: 0.6);
+      case CommandExecutionStatus.idle:
+        bgColor = _idleColor();
+    }
+
     final icon = _iconForCommand(command.name);
 
     return GestureDetector(
@@ -82,12 +118,12 @@ class CommandIconButton extends StatelessWidget {
             end: Alignment.bottomRight,
             colors: [
               bgColor.withValues(alpha: 0.95),
-              bgColor.withValues(alpha: 0.75),
+              bgColor.withValues(alpha: 0.72),
             ],
           ),
           boxShadow: [
             BoxShadow(
-              color: bgColor.withValues(alpha: 0.5),
+              color: bgColor.withValues(alpha: 0.45),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),

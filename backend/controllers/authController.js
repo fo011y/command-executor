@@ -10,7 +10,7 @@ export const register = async (req, res) => {
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const { email, password, serial_number } = req.body;
+  const { email, password, serial_number, phone } = req.body;
 
   if (!serial_number) {
     return res.status(400).json({ error: 'Серийный номер обязателен' });
@@ -41,8 +41,8 @@ export const register = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const result = await pool.query(
-      'INSERT INTO users (email, password, module_serial, is_active) VALUES ($1, $2, $3, $4) RETURNING id, email, role, is_active, created_at',
-      [email, hashedPassword, serial_number, false]
+      'INSERT INTO users (email, password, module_serial, phone, is_active) VALUES ($1, $2, $3, $4, $5) RETURNING id, email, role, is_active, created_at',
+      [email, hashedPassword, serial_number, phone || '', false]
     );
 
     const user = result.rows[0];

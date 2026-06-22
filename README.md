@@ -148,20 +148,20 @@ POST /api/device/commands/ack  — подтвердить выполнение
 
 ## Деплой
 
-Сервер: `connect.gsmcanbox.ru` (IP: `80.87.198.101`)
+Сервер: `connect.gsmcanbox.ru` (IP: `82.146.60.239`)
 
 ```bash
 # Загрузить файл бэкенда
-pscp -pw "..." file.js root@80.87.198.101:/opt/connect.gsmcanbox.ru/backend/...
+pscp -pw "..." file.js root@82.146.60.239:/opt/connect.gsmcanbox.ru/backend/src/...
 
-# Перезапустить бэкенд
-plink -ssh root@80.87.198.101 -pw "..." -batch "pm2 restart command-executor"
+# Перезапустить бэкенд (PM2 процесс id=3)
+plink -ssh root@82.146.60.239 -pw "..." -batch "pm2 restart command-executor"
 
-# Задеплоить фронтенд
-plink -ssh root@80.87.198.101 -pw "..." -batch "cd /opt/connect.gsmcanbox.ru/frontend && npm run deploy"
+# Задеплоить фронтенд (из локальной папки C:\Projects\gcb-connect\frontend)
+cd frontend && npm run build
+# npm run deploy = vite build && cp -r dist/. /var/www/www-root/data/www/connect.gsmcanbox.ru/
+plink -ssh root@82.146.60.239 -pw "..." -batch "cd /opt/connect.gsmcanbox.ru/frontend && npm run deploy"
 ```
-
-Подробнее — `DEPLOY_INSTRUCTIONS.md`.
 
 ## Безопасность
 
